@@ -1,0 +1,119 @@
+{block name="no-return-functions"}
+{$admin_current_location = 'modules'}
+{/block}
+
+
+{block name="check-auth"}
+{check_auth role="ADMIN" module=$module_code|default:null access="view" login_tpl="/admin/login"}
+{/block}
+
+{block name="main-content"}
+{default_translation_domain domain='facebookfeed.bo.default'}
+
+<div class="modules-configure">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="general-block-decorator">
+                    <div class="title">
+                        {intl l='Facebook Feed Configuration'}
+                    </div>
+                    <form action="{url path='/admin/module/FacebookFeed/config/save'}" method="post">
+                        <div class="form-group ">
+                            <label for="facebook_feed_color_attribut_id" class="control-label">
+                                {intl l='Color attribut id'}
+                            </label>
+                            <input type="text" id="facebook_feed_color_attribut_id" name="color_attribut_id"
+                                   class="form-control " value="{{$attribute_color_id}}">
+                            <span class="help-block">{intl l='This field corresponds to the list of attribute ids intended to define the color(the form is 14,12,1,4).'}</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="facebook_feed_size_attribut_id" class="control-label">
+                                {intl l='Size attribut id'}
+                            </label>
+                            <input type="text" id="facebook_feed_size_attribut_id" name="size_attribut_id"
+                                   class="form-control " value="{{$attribute_size_id}}">
+                            <span class="help-block">{intl l='This field corresponds to the list of attribute ids intended to define the size (the form is 14,12,1,4).'}</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="facebook_feed_has_stock" class="control-label">
+                                {intl l='Availability in stock'}
+                            </label>
+                            <input type="checkbox" id="facebook_feed_has_stock" name="has_stock" {if $has_stock == 1}checked="checked"{/if}>
+                            <span class="help-block" >{intl l='If the box is checked then will only export products with stock'}</span>
+                        </div>
+                        <button type="submit" name="save_mode"
+                                class="form-submit-button btn btn-sm btn-default btn-success" title="{intl l='Save'}">
+                            <span class="glyphicon glyphicon-ok"></span></button>
+                    </form>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="general-block-decorator">
+                    <div class="title">
+                        {intl l='Facebook Feed'}
+                    </div>
+                    <a href="http://classic-ride.th/admin/module/FacebookFeed/export">
+                        <button type="button" class="btn btn-default btn-primary btn-sm decal">
+                            {intl l='Export facebook feed'}
+                        </button>
+                    </a>
+                        <div class="alert alert-info">
+                            {intl l='Please note the export may take several minutes to complete.'}
+                        </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="col-lg-12">
+    <div class="general-block-decorator">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="title">
+                    {intl l='Old feed'}
+                </div>
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>{intl l='File name'}</th>
+                        <th>{intl l='Date'}</th>
+                        <th>{intl l='Action'}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {foreach $facebook_feed as $file => $date}
+                        <tr>
+                            <td>{$file}</td>
+                            <td>{$date}</td>
+                            <td>
+                                <form action="{url path='/admin/module/FacebookFeed/download'}" method="post">
+                                    <input type="hidden" name="file_name" value="{$file}">
+                                    <button class="btn btn-default" >{intl l='Download'}</button>
+                                </form>
+                                <form action="{url path='/admin/module/FacebookFeed/delete'}" method="post">
+                                    <input type="hidden" name="file_name" value="{$file}">
+                                    <button class="btn btn-default" >{intl l='Delete'}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {/foreach}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+
+{/block}
+
+{block name="javascript-initialization"}
+{/block}
+
+
+{block name="javascript-last-call"}
+{/block}
