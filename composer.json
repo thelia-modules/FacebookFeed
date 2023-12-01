@@ -1,5 +1,5 @@
 {
-  "name": "your-vendor/facebook-feed-module",
+  "name": "thelia/facebook-feed-module",
   "description": "FacebookFeed module for Thelia",
   "license": "LGPL-3.0-or-later",
   "type": "thelia-module",
