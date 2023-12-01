@@ -53,7 +53,7 @@
                     <div class="title">
                         {intl l='Facebook Feed'}
                     </div>
-                    <a href="http://classic-ride.th/admin/module/FacebookFeed/export">
+                    <a href="{url path='/admin/module/FacebookFeed/export'}">
                         <button type="button" class="btn btn-default btn-primary btn-sm decal">
                             {intl l='Export facebook feed'}
                         </button>
@@ -96,6 +96,12 @@
                                     <input type="hidden" name="file_name" value="{$file}">
                                     <button class="btn btn-default" >{intl l='Delete'}</button>
                                 </form>
+                                {$url = "/facebookfeed/"|cat:$file}
+                                {$url = $url|cat:"/feed.csv"}
+
+                                <a href="#" id="copy-feed" class="js_btn_clipboard btn-control-feed btn btn-default" data-toggle="tooltip" title="" data-clipboardtext="{url path=$url}">
+                                    <span class="glyphicon glyphicon-link"></span>
+                                </a>
                             </td>
                         </tr>
                     {/foreach}
@@ -112,6 +118,22 @@
 {/block}
 
 {block name="javascript-initialization"}
+<script>
+    const button = document.getElementById('copy-feed');
+    button.addEventListener("click", function() {
+        console.log('event')
+        copyToClipboard(button.getAttribute('data-clipboardtext'))
+    });
+    function copyToClipboard(text) {
+        var textArea = document.createElement("textarea");
+        document.body.appendChild(textArea);
+        textArea.value = text;
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        console.log('Texte copié :', text);
+    }
+</script>
 {/block}
 
 

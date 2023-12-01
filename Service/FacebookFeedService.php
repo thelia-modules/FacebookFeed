@@ -160,23 +160,6 @@ class FacebookFeedService
                 LEFT OUTER JOIN product_image product_image_default ON (pse.PRODUCT_ID = product_image_default.PRODUCT_ID AND product_image_default.POSITION = 1)
                 LEFT OUTER JOIN product_image product_image_on_pse ON (product_image_on_pse.ID = pse_image.PRODUCT_IMAGE_ID)
                 
-                /** Specific query to manage product statuses **/
-                LEFT JOIN product_product_status pps ON pse.product_id = pps.product_id
-                LEFT JOIN product_status ps ON pps.product_status_id = ps.id
-                JOIN product_sale_elements_delivery_info psedi ON pse.id = psedi.product_sale_elements_id
-
-                WHERE (ps.code = 'sale' AND pse.quantity > 0 AND psedi.delivery_info_id = 1)
-                   OR (ps.code = 'discontinued' AND psedi.delivery_info_id = 1 AND pse.quantity > 0)
-                   OR (ps.code = 'oddment' AND pse.quantity > 0)
-                   OR (
-                        ps.code = 'normal' OR (
-                            ps.code != 'oddment' AND
-                            ps.code != 'discontinued' AND
-                            ps.code != 'sale'
-                        )
-                        OR isnull(ps.code)
-                    )
-                /*-----------------------------------------------*/  
                 GROUP BY pse.ID";
 
         $limit = $this->checkPositiveInteger($limit);
