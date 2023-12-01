@@ -15,7 +15,12 @@ class ConfigurationHook extends BaseHook
 {
     public function onModuleConfiguration(HookRenderEvent $event): void
     {
-        $files = array_diff(scandir(FacebookFeed::EXPORT_DIR), array('.', '..'));
+        $dirXml = FacebookFeed::EXPORT_DIR;
+
+        if (!is_dir($dirXml)) {
+            mkdir($dirXml);
+        }
+        $files = array_diff(scandir($dirXml), array('.', '..'));
         $i = 0;
         $data = [];
         foreach ($files as $file){
