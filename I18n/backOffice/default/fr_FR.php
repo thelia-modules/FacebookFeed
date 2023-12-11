@@ -12,7 +12,7 @@ return array(
     'Facebook Feed Configuration' => 'Configuration du flux Facebook',
     'File name' => 'Nom du fichier',
     'If the box is checked then will only export products with stock' => 'Si la case est cochée, seulement les produits avec du stock seront exportés.',
-    'Old feed' => 'Flux anciennement exporté(s)',
+    'Last flow export' => 'Dernier fichier généré',
     'Please note the export may take several minutes to complete.' => 'Attention l\'export peut prendre plusieurs minutes à finir en fonction du nombre de produit dans votre boutique.',
     'Save' => 'Sauvegarder',
     'Size attribut id' => 'Les ids des attributs lié à une taille (XL,L,M,S ...)',

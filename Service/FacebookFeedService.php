@@ -26,7 +26,7 @@ class FacebookFeedService
             mkdir($dirXml);
         }
 
-        $fileName = $dirXml.DS.'fluxfacebook-'.time().'-.csv';
+        $fileName = $dirXml.DS.'fluxfacebook.csv';
         $csvFile = fopen($fileName, 'w');
 
         $currency = Currency::getDefaultCurrency();

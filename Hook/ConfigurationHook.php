@@ -24,12 +24,10 @@ class ConfigurationHook extends BaseHook
         $i = 0;
         $data = [];
         foreach ($files as $file){
-            if (preg_match('/-(\d+)-/', $file, $matches)) {
-                $timestamp = (int)$matches[1];
-            }
+            $timestamp = filectime($dirXml.'/'.$file);
             $datetime = new DateTime("@$timestamp");
 
-            $data[$file] = $datetime->format('Y-m-d H:i:s');
+            $data[$file] = $datetime->format('d-m-Y H:i:s');
         }
 
         $event->add($this->render("module-configuration.html",[
