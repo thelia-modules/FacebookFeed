@@ -96,9 +96,7 @@
                                     <input type="hidden" name="file_name" value="{$file}">
                                     <button class="btn btn-default" >{intl l='Delete'}</button>
                                 </form>
-                                {$url = "/facebookfeed/"|cat:$file}
-                                {$url = $url|cat:"/feed.csv"}
-
+                                {$url = "/facebookfeed/feed"}
                                 <a href="#" id="copy-feed" class="js_btn_clipboard btn-control-feed btn btn-default" data-toggle="tooltip" title="" data-clipboardtext="{url path=$url}">
                                     <span class="glyphicon glyphicon-link"></span>
                                 </a>
