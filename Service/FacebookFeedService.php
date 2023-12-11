@@ -51,7 +51,7 @@ class FacebookFeedService
             $data[] = $productSaleElement['REF_PRODUCT'];
             $data[] = substr($productSaleElement['TITLE'], 0, 150);
 
-            $data[] = substr($productSaleElement['DESCRIPTION'], 0, 9999);
+            $data[] = htmlspecialchars(html_entity_decode(trim(strip_tags(substr($productSaleElement['DESCRIPTION'], 0, 9999)))), ENT_XML1);
 
             $availability = 'out of stock';
             if ($productSaleElement['QUANTITY'] > 0) {
