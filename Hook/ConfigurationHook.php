@@ -25,7 +25,7 @@ class ConfigurationHook extends BaseHook
         $i = 0;
         $data = [];
         foreach ($files as $file){
-            $timestamp = filectime($dirXml.'/'.$file);
+            $timestamp = filemtime($dirXml.'/'.$file);
             $datetime = new DateTime("@$timestamp");
             $timezone = new DateTimeZone('Europe/Paris');
             $datetime->setTimezone($timezone);
