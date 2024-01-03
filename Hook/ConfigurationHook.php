@@ -3,6 +3,7 @@
 namespace FacebookFeed\Hook;
 
 use DateTime;
+use DateTimeZone;
 use FacebookFeed\FacebookFeed;
 use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
@@ -26,7 +27,8 @@ class ConfigurationHook extends BaseHook
         foreach ($files as $file){
             $timestamp = filectime($dirXml.'/'.$file);
             $datetime = new DateTime("@$timestamp");
-
+            $timezone = new DateTimeZone('Europe/Paris');
+            $datetime->setTimezone($timezone);
             $data[$file] = $datetime->format('d-m-Y H:i:s');
         }
 
