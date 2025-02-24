@@ -18,16 +18,6 @@ class HookPseManager extends BaseHook
         ));
     }
 
-    public function onProductEditBottom(HookRenderEvent $event)
-    {
-        $event->add($this->render(
-            'product-edit-pse.html',
-            [
-                'pseId' => $event->getArgument('pse')
-            ]
-        ));
-    }
-
     public static function getSubscribedHooks(): array
     {
         return [
@@ -40,7 +30,7 @@ class HookPseManager extends BaseHook
             "product.details-details-form" => [
                 [
                     "type" => "back",
-                    "method" => "onProductEditBottom"
+                    "method" => "onPsePrice"
                 ],
             ]
         ];

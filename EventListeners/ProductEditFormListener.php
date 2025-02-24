@@ -66,7 +66,7 @@ class ProductEditFormListener implements EventSubscriberInterface
                         'data' => ($pseExcluded) && $pseExcluded->getIsExcluded(),
                         'required' => false,
                         'label' => Translator::getInstance()->trans(
-                            'Exclure cette déclinaison du flux facebook',
+                            'Exclure cette déclinaison du flux Facebook',
                             [],
                             FacebookFeed::DOMAIN_NAME
                         )
@@ -80,6 +80,7 @@ class ProductEditFormListener implements EventSubscriberInterface
         if (null === $productId = $event->getForm()->getRequest()->get('product_id')) {
             return ;
         }
+
         $product = ProductQuery::create()->findPk($productId);
 
         $pseExcluded = FacebookFeedProductExcludedQuery::create()
@@ -93,7 +94,7 @@ class ProductEditFormListener implements EventSubscriberInterface
                     'data' => ($pseExcluded) && $pseExcluded->getIsExcluded(),
                     'required' => false,
                     'label' => Translator::getInstance()->trans(
-                        'Exclure cette déclinaison du flux facebook',
+                        'Exclure cette déclinaison du flux Facebook',
                         [],
                         FacebookFeed::DOMAIN_NAME
                     )
@@ -113,6 +114,7 @@ class ProductEditFormListener implements EventSubscriberInterface
         $form = $this->requestStack->getCurrentRequest()->get('thelia_product_sale_element_update_form');
 
         if (!isset($form[$varName])) {
+            $form = $this->requestStack->getCurrentRequest()->get('thelia_product_default_sale_element_update_form');
             if (empty($form['facebook_feed_product_excluded'])) {
                 $form[$varName] = null;
             } else {
