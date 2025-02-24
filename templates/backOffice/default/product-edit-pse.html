@@ -1,0 +1,11 @@
+<tr>
+    <td style="background-color:#FFF;" colspan="2">
+        {$formField = "facebook_feed_product_excluded"}
+        {if $pseId != null}
+            {$formField = "facebook_feed_product_excluded_{$pseId}"}
+        {/if}
+
+
+        {render_form_field field="$formField"}
+    </td>
+</tr>

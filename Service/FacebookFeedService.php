@@ -3,6 +3,7 @@
 namespace FacebookFeed\Service;
 
 use FacebookFeed\FacebookFeed;
+use FacebookFeed\Model\FacebookFeedProductExcludedQuery;
 use Propel\Runtime\Propel;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -160,6 +161,7 @@ class FacebookFeedService
                 LEFT OUTER JOIN product_image product_image_default ON (pse.PRODUCT_ID = product_image_default.PRODUCT_ID AND product_image_default.POSITION = 1)
                 LEFT OUTER JOIN product_image product_image_on_pse ON (product_image_on_pse.ID = pse_image.PRODUCT_IMAGE_ID)
                 
+                WHERE pse.ID NOT IN (SELECT pse_id FROM facebook_feed_product_excluded WHERE is_excluded = 1)
                 GROUP BY pse.ID";
 
         $limit = $this->checkPositiveInteger($limit);
