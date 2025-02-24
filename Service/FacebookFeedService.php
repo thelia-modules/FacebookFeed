@@ -3,7 +3,6 @@
 namespace FacebookFeed\Service;
 
 use FacebookFeed\FacebookFeed;
-use FacebookFeed\Model\FacebookFeedProductExcludedQuery;
 use Propel\Runtime\Propel;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;

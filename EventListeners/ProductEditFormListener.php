@@ -2,10 +2,7 @@
 
 namespace FacebookFeed\EventListeners;
 
-use ClassicRide\ClassicRide;
-use ClassicRide\Model\ProductSaleElementsEan13Query;
 use FacebookFeed\FacebookFeed;
-use FacebookFeed\Model\FacebookFeedProductExcluded;
 use FacebookFeed\Model\FacebookFeedProductExcludedQuery;
 use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
