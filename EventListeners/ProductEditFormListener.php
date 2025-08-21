@@ -4,16 +4,19 @@ namespace FacebookFeed\EventListeners;
 
 use FacebookFeed\FacebookFeed;
 use FacebookFeed\Model\FacebookFeedProductExcludedQuery;
+use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\ActionEvent;
+use Thelia\Core\Event\Product\ProductCloneEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\Event\TheliaFormEvent;
 use Thelia\Core\Translation\Translator;
 use Thelia\Model\ProductQuery;
+use Thelia\Model\ProductSaleElementsQuery;
 
 class ProductEditFormListener implements EventSubscriberInterface
 {
@@ -31,7 +34,8 @@ class ProductEditFormListener implements EventSubscriberInterface
         return [
             TheliaEvents::FORM_BEFORE_BUILD . '.thelia_product_sale_element_update_form' => ['extendProductPriceForm', 100],
             TheliaEvents::FORM_BEFORE_BUILD . '.thelia_product_default_sale_element_update_form' => ['extendProductPriceDefaultForm', 100],
-            TheliaEvents::PRODUCT_UPDATE_PRODUCT_SALE_ELEMENT => ['saveProductData', 100]
+            TheliaEvents::PRODUCT_UPDATE_PRODUCT_SALE_ELEMENT => ['saveProductData', 100],
+            TheliaEvents::PRODUCT_CLONE => ['cloneProductData', 100]
         ];
     }
 
@@ -126,5 +130,42 @@ class ProductEditFormListener implements EventSubscriberInterface
             ->findOneOrCreate();
 
         $productIsExcluded->setIsExcluded($isExcluded)->save();
+    }
+
+    public function cloneProductData(ProductCloneEvent $event)
+    {
+        $clonedProduct = $event->getClonedProduct();
+        $originalProduct = $event->getOriginalProduct();
+
+        foreach ($originalProduct->getProductSaleElementss() as $originalPse) {
+
+            $attributeAvIds = array_map(function ($attributeCombination) {
+                return $attributeCombination->getAttributeAvId();
+            }, $originalPse->getAttributeCombinations()->getData());
+
+            $clonedPse = ProductSaleElementsQuery::create()
+                ->filterByProductId($clonedProduct->getId())
+                ->useAttributeCombinationQuery()
+                    ->filterByAttributeAvId($attributeAvIds)
+                ->endUse()
+                ->findOne()
+            ;
+
+            if (null === $clonedPse){
+                continue;
+            }
+
+            $originalPseIsExcluded = FacebookFeedProductExcludedQuery::create()
+                ->filterByPseId($originalPse->getId())
+                ->findOne();
+
+            if (null !== $originalPseIsExcluded) {
+                $clonedPseIsExcluded = FacebookFeedProductExcludedQuery::create()
+                    ->filterByPseId($clonedPse->getId())
+                    ->findOneOrCreate();
+
+                $clonedPseIsExcluded->setIsExcluded($originalPseIsExcluded->getIsExcluded())->save();
+            }
+        }
     }
 }
