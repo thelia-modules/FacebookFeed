@@ -144,7 +144,7 @@ class FacebookFeedService
                 COALESCE(price_on_currency.PRICE, CASE WHEN NOT ISNULL(price_default.PRICE) THEN ROUND(price_default.PRICE * :currate, 2) END) AS PRICE,
                 COALESCE(price_on_currency.PROMO_PRICE, CASE WHEN NOT ISNULL(price_default.PROMO_PRICE) THEN ROUND(price_default.PROMO_PRICE * :currate, 2) END) AS PROMO_PRICE,
                 rewriting_url.URL AS REWRITTEN_URL,
-                COALESCE(product_image_on_pse.FILE, product_image_default.FILE) AS IMAGE_NAME
+                COALESCE(product_image_i18n_on_pse.FILE, product_image_i18n_default.FILE) AS IMAGE_NAME,
                 
                 FROM product_sale_elements AS pse
                 
@@ -158,7 +158,9 @@ class FacebookFeedService
                 LEFT OUTER JOIN rewriting_url ON (pse.PRODUCT_ID = rewriting_url.VIEW_ID AND rewriting_url.view = 'product' AND rewriting_url.view_locale = :locale AND rewriting_url.redirected IS NULL)
                 LEFT OUTER JOIN product_sale_elements_product_image pse_image ON (pse.ID = pse_image.PRODUCT_SALE_ELEMENTS_ID)
                 LEFT OUTER JOIN product_image product_image_default ON (pse.PRODUCT_ID = product_image_default.PRODUCT_ID AND product_image_default.POSITION = 1)
+                LEFT OUTER JOIN product_image_i18n product_image_i18n_default ON (product_image_i18n_default.ID = product_image_default.ID)
                 LEFT OUTER JOIN product_image product_image_on_pse ON (product_image_on_pse.ID = pse_image.PRODUCT_IMAGE_ID)
+                LEFT OUTER JOIN product_image_i18n product_image_i18n_on_pse ON (product_image_i18n_on_pse.ID = product_image_on_pse.ID)
                 
                 WHERE pse.ID NOT IN (SELECT pse_id FROM facebook_feed_product_excluded WHERE is_excluded = 1)
                 GROUP BY pse.ID";
