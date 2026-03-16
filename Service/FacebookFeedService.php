@@ -11,14 +11,13 @@ use Thelia\Model\Base\CountryQuery;
 use Thelia\Model\ConfigQuery;
 use Thelia\Model\Country;
 use Thelia\Model\Currency;
-use Thelia\Model\LangQuery;
 use Thelia\Model\ProductQuery;
 use Thelia\TaxEngine\Calculator;
 use Thelia\Tools\URL;
 
 class FacebookFeedService
 {
-    public function exportFacebookFeed(?int $limit = null, ?int $offset = null,?OutputInterface $output = null) :string
+    public function exportFacebookFeed(?int $limit = null, ?int $offset = null, ?OutputInterface $output = null, string $locale = 'fr_FR') :string
     {
         $dirXml = FacebookFeed::EXPORT_DIR;
 
@@ -26,12 +25,12 @@ class FacebookFeedService
             mkdir($dirXml);
         }
 
-        $fileName = $dirXml.DS.'fluxfacebook.csv';
+        $fileName = $dirXml.DS.'fluxfacebook_'. $locale .'.csv';
         $csvFile = fopen($fileName, 'w');
 
         $currency = Currency::getDefaultCurrency();
         $country = $this->getDefaultCountry();
-        $baseUrl = ConfigQuery::read('url_site');
+        $baseUrl = URL::getInstance()->getBaseUrl();
 
         $productItems = $this->getProductItems($limit,$offset);
         if ($output){
@@ -64,7 +63,7 @@ class FacebookFeedService
             $price = $calculator->getTaxedPrice($productSaleElement['PRICE']);
             $data[] = round(doubleval($price), 2) . " " . $currency->getCode();
 
-            $data[] = $this->getUrl($productSaleElement);
+            $data[] = $this->getUrl($productSaleElement, $locale);
             $data[] = $baseUrl . '/cache/images/product/' . $productSaleElement['IMAGE_NAME'];
             $data[] = $productSaleElement['BRAND_TITLE'];
 
@@ -81,14 +80,14 @@ class FacebookFeedService
             $color = '';
             $colorAttributeIds = FacebookFeed::getConfigValue(FacebookFeed::ATTRIBUTE_COLOR_ID,null);
             if ($colorAttributeIds){
-                $color = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$colorAttributeIds));
+                $color = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$colorAttributeIds), $locale);
             }
             $data[] = $color;
 
             $sizeAttributeIds = FacebookFeed::getConfigValue(FacebookFeed::ATTRIBUTE_SIZE_ID,null);
             $size = '';
             if ($sizeAttributeIds){
-                $size = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$sizeAttributeIds));
+                $size = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$sizeAttributeIds), $locale);
             }
             $data[] = $size;
 
@@ -105,7 +104,7 @@ class FacebookFeedService
     }
 
 
-    private function getAttributeAvTitle(int $pseId, array $attributeIds): ?string
+    private function getAttributeAvTitle(int $pseId, array $attributeIds, string $locale): ?string
     {
         $attribute = '';
         $attributeCombinations = AttributeCombinationQuery::create()
@@ -115,15 +114,15 @@ class FacebookFeedService
 
         foreach ($attributeCombinations as $attributeCombination) {
             if (!$attribute) {
-                $attribute = $attributeCombination?->getAttributeAv()?->setLocale('fr_FR')->getTitle();
+                $attribute = $attributeCombination?->getAttributeAv()?->setLocale($locale)->getTitle();
                 continue;
             }
-            $attribute .= ',' . $attributeCombination?->getAttributeAv()?->setLocale('fr_FR')->getTitle();
+            $attribute .= ',' . $attributeCombination?->getAttributeAv()?->setLocale($locale)->getTitle();
         }
         return $attribute;
     }
 
-    protected function getProductItems(int $limit = null, int $offset = null): array|false
+    protected function getProductItems(int $limit = null, int $offset = null, string $locale = 'fr_FR'): array|false
     {
         $sql = "SELECT 
 
@@ -181,7 +180,7 @@ class FacebookFeedService
 
         $con = Propel::getConnection();
         $stmt = $con->prepare($sql);
-        $stmt->bindValue(':locale', $this->getDefaultLang()->getLocale(), \PDO::PARAM_STR);
+        $stmt->bindValue(':locale', $locale, \PDO::PARAM_STR);
         $stmt->bindValue(':currid', $this->getDefaultCurrency()->getId(), \PDO::PARAM_INT);
         $stmt->bindValue(':currate', $this->getDefaultCurrency()->getRate(), \PDO::PARAM_STR);
 
@@ -195,11 +194,6 @@ class FacebookFeedService
     {
         $var = filter_var($var, FILTER_VALIDATE_INT);
         return ($var !== false && $var >= 0) ? $var : null;
-    }
-
-    private function getDefaultLang(): ?\Thelia\Model\Lang
-    {
-        return LangQuery::create()->filterByByDefault(1)->findOne();
     }
 
     private function getDefaultCurrency(): ?Currency
@@ -233,20 +227,14 @@ class FacebookFeedService
         return $taxCalculator;
     }
 
-    private function getUrl($product): string
+    private function getUrl($product, $locale): string
     {
-        $attributeAvID = AttributeCombinationQuery::create()
-            ->filterByProductSaleElementsId($product["ID"])
-            ->findOne();
-
         $urlManager = URL::getInstance();
 
-        $url = null;
         if ($product['REWRITTEN_URL'] === null) {
-            $url = $urlManager->retrieve('product', $product['ID_PRODUCT'], $this->getDefaultLang()->getLocale())->toString();
-        } else {
-            $url = $urlManager->absoluteUrl($product['REWRITTEN_URL']);
+            return $urlManager->retrieve('product', $product['ID_PRODUCT'], $locale)->toString();
         }
-        return $url;
+
+        return $urlManager->absoluteUrl($product['REWRITTEN_URL']);
     }
 }

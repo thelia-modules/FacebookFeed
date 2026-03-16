@@ -14,6 +14,7 @@ use Thelia\Core\Archiver\ArchiverManager;
 use Thelia\Core\Serializer\SerializerManager;
 use Thelia\Handler\ExportHandler;
 use Thelia\Model\ExportQuery;
+use Thelia\Model\LangQuery;
 
 class FacebookFeedCommand extends ContainerAwareCommand
 {
@@ -48,7 +49,10 @@ class FacebookFeedCommand extends ContainerAwareCommand
         $limit = (int)$input->getArgument('limit');
         $offset = (int)$input->getArgument('offset');
 
-        $this->facebookFeedService->exportFacebookFeed($limit,$offset,$output);
-        return 1;
+        foreach (LangQuery::create()->findByActive(1) as $lang) {
+            $this->facebookFeedService->exportFacebookFeed($limit,$offset,$output, $lang->getLocale());
+        }
+
+        return self::SUCCESS;
     }
 }
