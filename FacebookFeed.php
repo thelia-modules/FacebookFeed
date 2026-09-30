@@ -1,74 +1,65 @@
 <?php
 
+declare(strict_types=1);
+
+/*
+ * This file is part of the Thelia package.
+ * http://www.thelia.net
+ *
+ * (c) OpenStudio <info@thelia.net>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace FacebookFeed;
 
 use Propel\Runtime\Connection\ConnectionInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use Symfony\Component\Finder\Finder;
-use Thelia\Install\Database;
+use Thelia\Core\Install\Database;
 use Thelia\Module\BaseModule;
 
 class FacebookFeed extends BaseModule
 {
-    /** @var string */
-    const DOMAIN_NAME = 'facebookfeed';
+    public const DOMAIN_NAME = 'facebookfeed';
 
-    const EXPORT_DIR = THELIA_LOCAL_DIR . 'fluxFacebook';
+    /** Folder of the generated files, under the `local/` directory of the project. */
+    public const EXPORT_DIRECTORY_NAME = 'fluxFacebook';
 
-    const ATTRIBUTE_COLOR_ID = 'attribute_color_id';
-    const ATTRIBUTE_SIZE_ID = 'attribute_size_id';
-    const HAS_STOCK = 'has_stock';
+    public const ATTRIBUTE_COLOR_ID = 'attribute_color_id';
+    public const FEATURE_COLOR_ID = 'feature_color_id';
+    public const ATTRIBUTE_SIZE_ID = 'attribute_size_id';
+    public const HAS_STOCK = 'has_stock';
+    public const IMAGE_FILTER = 'image_filter';
 
-
-
-    /*
-     * You may now override BaseModuleInterface methods, such as:
-     * install, destroy, preActivation, postActivation, preDeactivation, postDeactivation
-     *
-     * Have fun !
-     */
+    /** Filter set that serves the image as uploaded: defined by the Flexy theme, not by the image library. */
+    public const DEFAULT_IMAGE_FILTER = 'default';
 
     /**
-     * Defines how services are loaded in your modules
-     *
-     * @param ServicesConfigurator $servicesConfigurator
+     * Creates the exclusion table once. The script never drops anything: on a database carried
+     * over from the 0.x line, the exclusions already stored are kept.
      */
-    public static function configureServices(ServicesConfigurator $servicesConfigurator): void
+    public function postActivation(?ConnectionInterface $con = null): void
     {
-        $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
-            ->exclude([THELIA_MODULE_DIR . ucfirst(self::getModuleCode()). "/I18n/*"])
-            ->autowire(true)
-            ->autoconfigure(true);
-    }
-
-    /**
-     * Execute sql files in Config/update/ folder named with module version (ex: 1.0.1.sql).
-     *
-     * @param $currentVersion
-     * @param $newVersion
-     * @param ConnectionInterface $con
-     */
-    public function update($currentVersion, $newVersion, ConnectionInterface $con = null): void
-    {
-        $updateDir = __DIR__.DS.'Config'.DS.'update';
-
-        if (! is_dir($updateDir)) {
+        if ('1' === self::getConfigValue('is_initialized')) {
             return;
         }
 
-        $finder = Finder::create()
-            ->name('*.sql')
-            ->depth(0)
-            ->sortByName()
-            ->in($updateDir);
+        (new Database($con))->insertSql(null, [__DIR__.'/Config/TheliaMain.sql']);
 
-        $database = new Database($con);
+        self::setConfigValue('is_initialized', '1');
+    }
 
-        /** @var \SplFileInfo $file */
-        foreach ($finder as $file) {
-            if (version_compare($currentVersion, $file->getBasename('.sql'), '<')) {
-                $database->insertSql(null, [$file->getPathname()]);
-            }
-        }
+    public static function configureServices(ServicesConfigurator $servicesConfigurator): void
+    {
+        $servicesConfigurator->load(self::getModuleCode().'\\', __DIR__)
+            ->exclude([
+                __DIR__.'/I18n/*',
+                __DIR__.'/Model/*',
+                __DIR__.'/Tests/*',
+                __DIR__.'/templates/*',
+            ])
+            ->autowire()
+            ->autoconfigure();
     }
 }

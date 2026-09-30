@@ -1,0 +1,21 @@
+{# Rendered inside a hook_cards() wrapper (its own titled card), no outer card here #}
+
+{% if exclusion_form.excluded_combinations.children is empty %}
+    <p class="text-muted mb-0">{{ 'This product has no combination.'|trans({}, 'facebookfeed') }}</p>
+{% else %}
+    {% set can_update = is_granted('UPDATE', {resource: 'admin.product'}) %}
+    {% form_theme exclusion_form with bo_form_themes only %}
+    {{ form_start(exclusion_form, {action: path('facebookfeed.product.exclusions', {productId: product_id}), method: 'post'}) }}
+    {{ form_widget(exclusion_form.success_url, {value: path('admin.products.update', {product_id: product_id, current_tab: 'modules'})}) }}
+    {{ form_widget(exclusion_form.error_url, {value: path('admin.products.update', {product_id: product_id, current_tab: 'modules'})}) }}
+    {% do exclusion_form.success_url.setRendered %}
+    {% do exclusion_form.error_url.setRendered %}
+
+    <p class="text-muted">{{ 'Check the combinations to keep out of the Facebook feed.'|trans({}, 'facebookfeed') }}</p>
+    {{ form_row(exclusion_form.excluded_combinations) }}
+
+    {% if can_update %}
+        <button type="submit" class="btn btn-primary">{{ 'Save'|trans }}</button>
+    {% endif %}
+    {{ form_end(exclusion_form) }}
+{% endif %}

@@ -1,0 +1,85 @@
+{# Configuration fragment, no {% extends %}: rendered inside the module-configure page #}
+{% set return_url = path('admin.module.configure', {module_code: 'FacebookFeed'}) %}
+{% set can_update = is_granted('UPDATE', {resource: 'admin.module', module: 'FacebookFeed'}) %}
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">{{ 'Facebook feed settings'|trans({}, 'facebookfeed') }}</div>
+            <div class="card-body">
+                {% form_theme settings_form with bo_form_themes only %}
+                {{ form_start(settings_form, {action: path('facebookfeed.settings.save'), method: 'post'}) }}
+                {{ form_widget(settings_form.success_url, {value: return_url}) }}
+                {{ form_widget(settings_form.error_url, {value: return_url}) }}
+                {% do settings_form.success_url.setRendered %}
+                {% do settings_form.error_url.setRendered %}
+
+                {{ form_row(settings_form.color_feature_ids) }}
+                {{ form_row(settings_form.color_attribute_ids) }}
+                {{ form_row(settings_form.size_attribute_ids) }}
+                {{ form_row(settings_form.in_stock_only) }}
+                {{ form_row(settings_form.image_filter) }}
+
+                {% if can_update %}
+                    <button type="submit" class="btn btn-primary">{{ 'Save'|trans }}</button>
+                {% endif %}
+                {{ form_end(settings_form) }}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">{{ 'Facebook feed'|trans({}, 'facebookfeed') }}</div>
+            <div class="card-body">
+                <p>{{ 'The feed is generated outside the web request, for every active language, with the command below (run it from a scheduled task).'|trans({}, 'facebookfeed') }}</p>
+                <pre class="mb-3"><code>php bin/console facebook:feed:generate</code></pre>
+                <p class="mb-1">{{ 'Address to give to Facebook (each language answers on its own domain):'|trans({}, 'facebookfeed') }}</p>
+                <p><code>{{ url('FacebookFeed_csv') }}</code></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">{{ 'Generated files'|trans({}, 'facebookfeed') }}</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>{{ 'File name'|trans({}, 'facebookfeed') }}</th>
+                        <th>{{ 'Date'|trans({}, 'facebookfeed') }}</th>
+                        <th class="text-end">{{ 'Actions'|trans }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, date in files %}
+                        <tr>
+                            <td>{{ name }}</td>
+                            <td>{{ date|date('d-m-Y H:i:s', 'Europe/Paris') }}</td>
+                            <td class="text-end">
+                                <a class="btn btn-secondary btn-sm" href="{{ path('facebookfeed.file.download', {fileName: name}) }}">
+                                    <i class="bi bi-download"></i> {{ 'Download'|trans({}, 'facebookfeed') }}
+                                </a>
+                                {% if can_update %}
+                                    <form method="post" action="{{ path('facebookfeed.file.delete') }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ delete_token }}">
+                                        <input type="hidden" name="file_name" value="{{ name }}">
+                                        <button type="submit" class="btn btn-danger btn-sm">
+                                            <i class="bi bi-trash"></i> {{ 'Delete'|trans({}, 'facebookfeed') }}
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-muted">{{ 'No feed has been generated yet.'|trans({}, 'facebookfeed') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

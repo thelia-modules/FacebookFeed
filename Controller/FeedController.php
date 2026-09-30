@@ -1,37 +1,48 @@
 <?php
 
+declare(strict_types=1);
+
+/*
+ * This file is part of the Thelia package.
+ * http://www.thelia.net
+ *
+ * (c) OpenStudio <info@thelia.net>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace FacebookFeed\Controller;
 
-use FacebookFeed\FacebookFeed;
-use Symfony\Component\HttpFoundation\RedirectResponse;
+use FacebookFeed\Service\FacebookFeedService;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 use Thelia\Controller\Front\BaseFrontController;
-use Thelia\Core\HttpFoundation\Response;
-use Thelia\Model\ConfigQuery;
-use Thelia\Tools\URL;
+use Thelia\Core\HttpFoundation\Session\Session;
+use Thelia\Model\Lang;
 
 class FeedController extends BaseFrontController
 {
-    #[Route('/facebookfeed/feed', name: 'FacebookFeed_csv', methods: 'GET')]
-    public function getCSVFeed(RequestStack $requestStack): Response|RedirectResponse
+    /**
+     * The feed of the language of the domain. Without a generated file the answer is an explicit
+     * error, never a page of the shop: the reader of the feed would take it for the feed.
+     */
+    #[Route('/facebookfeed/feed', name: 'FacebookFeed_csv', methods: ['GET'], defaults: ['ignore_thelia_view' => true])]
+    public function getCSVFeed(Request $request, FacebookFeedService $facebookFeedService): Response
     {
-        $locale = $requestStack->getCurrentRequest()->getSession()->getLang()->getLocale();
+        $session = $request->hasSession() ? $request->getSession() : null;
+        $lang = $session instanceof Session ? $session->getLang() : null;
+        $locale = $lang instanceof Lang ? (string) $lang->getLocale() : $request->getLocale();
 
-        $fileName = FacebookFeed::EXPORT_DIR.DS.'fluxfacebook_'. $locale .'.csv';
-
-        if (!file_exists($fileName)){
-            return $this->generateRedirect(
-                URL::getInstance()->absoluteUrl('/')
-            );
+        $path = $facebookFeedService->resolve($facebookFeedService->fileNameFor($locale));
+        if (null === $path) {
+            return new Response(\sprintf("The feed of the language %s has not been generated yet.\n", $locale), Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/plain; charset=utf-8']);
         }
-        $content = file_get_contents($fileName);
 
-        $response = new Response();
-        $response->setContent($content);
+        $response = new BinaryFileResponse($path);
         $response->headers->set('Content-Type', 'text/csv; charset=utf-8');
-        //$response->headers->set('Content-Disposition', 'attachment; filename="'.$file.'"');
 
         return $response;
     }

@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * This file is part of the Thelia package.
+ * http://www.thelia.net
+ *
+ * (c) OpenStudio <info@thelia.net>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace FacebookFeed\Form;
+
+use FacebookFeed\Service\EditionLocale;
+use FacebookFeed\Service\ExclusionRepository;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Thelia\Form\BaseForm;
+
+/**
+ * The combinations of the edited product, each with a box to keep it out of the feed.
+ */
+class ExclusionForm extends BaseForm
+{
+    public function __construct(
+        private readonly ExclusionRepository $exclusionRepository,
+        private readonly EditionLocale $editionLocale,
+    ) {
+    }
+
+    protected function buildForm(): void
+    {
+        $productId = (int) ($this->request->attributes->get('productId') ?? $this->request->query->get('product_id') ?? 0);
+
+        $choices = [];
+        foreach ($this->exclusionRepository->combinationsOfProduct($productId, $this->editionLocale->of($this->request)) as $combination) {
+            $label = '' === $combination['label'] ? $combination['reference'] : \sprintf('%s (%s)', $combination['reference'], $combination['label']);
+            $choices[$label] = $combination['id'];
+        }
+
+        $this->formBuilder->add('excluded_combinations', ChoiceType::class, [
+            'required' => false,
+            'multiple' => true,
+            'expanded' => true,
+            'label' => false,
+            'choices' => $choices,
+        ]);
+    }
+
+    public static function getName(): string
+    {
+        return 'facebookfeed_exclusion';
+    }
+}

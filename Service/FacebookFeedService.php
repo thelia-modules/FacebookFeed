@@ -1,275 +1,285 @@
 <?php
 
+declare(strict_types=1);
+
+/*
+ * This file is part of the Thelia package.
+ * http://www.thelia.net
+ *
+ * (c) OpenStudio <info@thelia.net>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 namespace FacebookFeed\Service;
 
+use FacebookFeed\Exception\FeedGenerationException;
 use FacebookFeed\FacebookFeed;
-use Propel\Runtime\Propel;
-use Symfony\Component\Console\Helper\ProgressBar;
-use Symfony\Component\Console\Output\OutputInterface;
-use Thelia\Model\AttributeCombinationQuery;
-use Thelia\Model\Base\CountryQuery;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Thelia\Model\ConfigQuery;
-use Thelia\Model\Country;
 use Thelia\Model\Currency;
+use Thelia\Model\Lang;
 use Thelia\Model\LangQuery;
-use Thelia\Model\ProductQuery;
-use Thelia\TaxEngine\Calculator;
 use Thelia\Tools\URL;
 
-class FacebookFeedService
+/**
+ * Writes the feed of a language: one csv file, `;` separated, one line per combination of every
+ * visible product that is not excluded.
+ *
+ * The file is written next to its final name and renamed once complete, so a reader (the feed
+ * address, the back-office download) never sees a half-written feed.
+ */
+final class FacebookFeedService
 {
-    public function exportFacebookFeed(?int $limit = null, ?int $offset = null, ?OutputInterface $output = null, string $locale = 'fr_FR') :string
-    {
-        $dirXml = FacebookFeed::EXPORT_DIR;
+    public const HEADER = [
+        'id', 'item_group_ID', 'title', 'description', 'availability', 'condition', 'price', 'link',
+        'image_link', 'additional_image_link', 'brand', 'quantity_to_sell_on_facebook', 'sale_price', 'color', 'size',
+    ];
 
-        if (!is_dir($dirXml)) {
-            mkdir($dirXml);
-        }
+    private const TITLE_LENGTH = 150;
+    private const DESCRIPTION_LENGTH = 9999;
 
-        $fileName = $dirXml.DS.'fluxfacebook_'. $locale .'.csv';
-        $csvFile = fopen($fileName, 'w');
-
-        $currency = Currency::getDefaultCurrency();
-        $country = $this->getDefaultCountry();
-        $baseUrl = URL::getInstance()->getBaseUrl();
-
-        if (ConfigQuery::isMultiDomainActivated()) {
-            $baseUrl = LangQuery::create()->findOneByLocale($locale)->getUrl();
-        }
-
-        $productItems = $this->getProductItems($limit,$offset, $locale);
-        if ($output){
-            $progressBar = new ProgressBar($output, count($productItems));
-        }
-        $header = ['id','title','description','availability','condition','price','link','image_link','brand',
-            'quantity_to_sell_on_facebook','sale_price','color','size'];
-        fputcsv($csvFile, $header,';');
-
-        foreach ($productItems as $productSaleElement) {
-            if (FacebookFeed::getConfigValue(FacebookFeed::HAS_STOCK,null) === '1' && $productSaleElement['QUANTITY'] < 1){
-                continue;
-            }
-
-            $productModel = ProductQuery::create()->findOneById($productSaleElement['ID_PRODUCT']);
-            $data = [];
-            $data[] = $productSaleElement['REF_PRODUCT'];
-            $data[] = substr($productSaleElement['TITLE'], 0, 150);
-
-            $data[] = htmlspecialchars(html_entity_decode(trim(strip_tags(substr($productSaleElement['DESCRIPTION'], 0, 9999)))), ENT_XML1);
-
-            $availability = 'out of stock';
-            if ($productSaleElement['QUANTITY'] > 0) {
-                $availability = 'in stock';
-            }
-            $data[] = $availability;
-
-            $data[] = 'new';
-            $calculator = $this->getTaxCalculator($productModel->getTaxRule(), $productModel, $country);
-            $price = $calculator->getTaxedPrice($productSaleElement['PRICE']);
-            $data[] = round(doubleval($price), 2) . " " . $currency->getCode();
-
-            $data[] = $this->getUrl($productSaleElement, $locale);
-            $data[] = $baseUrl . '/cache/images/product/' . $productSaleElement['IMAGE_NAME'];
-            $data[] = $productSaleElement['BRAND_TITLE'];
-
-            $data[] = $productSaleElement['QUANTITY'];
-
-
-            $pricePromo = '';
-            if ($productSaleElement['PROMO'] === 1) {
-                $price = $calculator->getTaxedPrice($productSaleElement['PROMO_PRICE']);
-                $pricePromo = round(doubleval($price), 2) . " " . $currency->getCode();
-            }
-            $data[] = $pricePromo;
-
-            $color = '';
-            $colorAttributeIds = FacebookFeed::getConfigValue(FacebookFeed::ATTRIBUTE_COLOR_ID,null);
-            if ($colorAttributeIds){
-                $color = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$colorAttributeIds), $locale);
-            }
-            $data[] = $color;
-
-            $sizeAttributeIds = FacebookFeed::getConfigValue(FacebookFeed::ATTRIBUTE_SIZE_ID,null);
-            $size = '';
-            if ($sizeAttributeIds){
-                $size = $this->getAttributeAvTitle($productSaleElement['ID'], explode(',',$sizeAttributeIds), $locale);
-            }
-            $data[] = $size;
-
-            fputcsv($csvFile,$data,';');
-            if ($output){
-                $progressBar->advance();
-            }
-        }
-        if ($output){
-            $progressBar->finish();
-        }
-        fclose($csvFile);
-        return $fileName;
+    public function __construct(
+        private readonly FeedRowReader $rowReader,
+        private readonly TaxedPrices $taxedPrices,
+        private readonly FeedImageUrls $imageUrls,
+        #[Autowire('%kernel.project_dir%/local/'.FacebookFeed::EXPORT_DIRECTORY_NAME)]
+        private readonly string $exportDirectory,
+    ) {
     }
 
-
-    private function getAttributeAvTitle(int $pseId, array $attributeIds, string $locale): ?string
+    public function fileNameFor(string $locale): string
     {
-        $attribute = '';
-        $attributeCombinations = AttributeCombinationQuery::create()
-            ->filterByAttributeId($attributeIds)
-            ->filterByProductSaleElementsId($pseId)
-            ->find();
+        return 'fluxfacebook_'.$locale.'.csv';
+    }
 
-        foreach ($attributeCombinations as $attributeCombination) {
-            if (!$attribute) {
-                $attribute = $attributeCombination?->getAttributeAv()?->setLocale($locale)->getTitle();
-                continue;
+    public function pathFor(string $locale): string
+    {
+        return $this->exportDirectory.\DIRECTORY_SEPARATOR.$this->fileNameFor($locale);
+    }
+
+    /**
+     * Takes the lock of the generation, so that two runs (overlapping scheduled tasks) never write
+     * the same files at once. Null when another run holds it; the lock is released when the
+     * returned handle is closed or the process ends.
+     *
+     * @return resource|null
+     */
+    public function tryLock()
+    {
+        $this->ensureDirectory();
+        $handle = fopen($this->exportDirectory.\DIRECTORY_SEPARATOR.'.generate.lock', 'c');
+        if (false === $handle) {
+            throw FeedGenerationException::directoryNotWritable($this->exportDirectory);
+        }
+        if (!flock($handle, \LOCK_EX | \LOCK_NB)) {
+            fclose($handle);
+
+            return null;
+        }
+
+        return $handle;
+    }
+
+    /**
+     * The generated files, by name, with their last modification.
+     *
+     * @return array<string, \DateTimeImmutable>
+     */
+    public function files(): array
+    {
+        $files = [];
+        foreach (glob($this->exportDirectory.\DIRECTORY_SEPARATOR.'fluxfacebook_*.csv') ?: [] as $path) {
+            $files[basename($path)] = (new \DateTimeImmutable('@'.(int) filemtime($path)));
+        }
+        ksort($files);
+
+        return $files;
+    }
+
+    /**
+     * The path of a generated file asked by name, null when the name is not one of a feed
+     * file (nothing outside the folder can be reached) or the file does not exist.
+     */
+    public function resolve(string $fileName): ?string
+    {
+        if (1 !== preg_match('/^fluxfacebook_[a-z]{2,3}_[A-Z]{2}\.csv$/', $fileName)) {
+            return null;
+        }
+
+        $path = $this->exportDirectory.\DIRECTORY_SEPARATOR.$fileName;
+
+        return is_file($path) ? $path : null;
+    }
+
+    public function delete(string $fileName): void
+    {
+        $path = $this->resolve($fileName);
+        if (null !== $path) {
+            unlink($path);
+        }
+    }
+
+    /**
+     * @param (callable(int): void)|null $onBatch called with the number of lines each batch wrote
+     *
+     * @throws FeedGenerationException
+     */
+    public function generate(string $locale, ?FeedSettings $settings = null, ?int $limit = null, ?int $offset = null, ?callable $onBatch = null): string
+    {
+        $settings ??= FeedSettings::fromConfiguration();
+        $baseUrl = $this->baseUrl($locale);
+        $this->imageUrls->assertFilterSetExists($settings->imageFilter);
+        $currencyCode = (string) Currency::getDefaultCurrency()->getCode();
+
+        $this->ensureDirectory();
+        $path = $this->pathFor($locale);
+        $temporaryPath = $path.'.tmp';
+
+        $handle = fopen($temporaryPath, 'w');
+        if (false === $handle) {
+            throw FeedGenerationException::directoryNotWritable($this->exportDirectory);
+        }
+
+        try {
+            fputcsv($handle, self::HEADER, ';', '"', '');
+
+            $skipped = 0;
+            $written = 0;
+            foreach ($this->rowReader->batches($locale, $settings) as $batch) {
+                $lines = 0;
+                foreach ($batch as $row) {
+                    if (null !== $offset && $skipped < $offset) {
+                        ++$skipped;
+                        continue;
+                    }
+                    if (null !== $limit && $written >= $limit) {
+                        break 2;
+                    }
+
+                    fputcsv($handle, $this->line($row, $locale, $baseUrl, $currencyCode, $settings), ';', '"', '');
+                    ++$written;
+                    ++$lines;
+                }
+                if (null !== $onBatch) {
+                    $onBatch($lines);
+                }
             }
-            $attribute .= ',' . $attributeCombination?->getAttributeAv()?->setLocale($locale)->getTitle();
+        } catch (\Throwable $exception) {
+            fclose($handle);
+            @unlink($temporaryPath);
+
+            throw $exception;
         }
-        return $attribute;
+
+        fclose($handle);
+        if (!rename($temporaryPath, $path)) {
+            @unlink($temporaryPath);
+
+            throw FeedGenerationException::directoryNotWritable($this->exportDirectory);
+        }
+
+        return $path;
     }
 
-    protected function getProductItems(int $limit = null, int $offset = null, string $locale = 'fr_FR'): array|false
+    /**
+     * @return list<string>
+     */
+    private function line(FeedRow $row, string $locale, string $baseUrl, string $currencyCode, FeedSettings $settings): array
     {
-        $sql = "SELECT 
+        $price = $this->taxedPrices->taxedPrice($row->price, $row->taxRuleId, $row->productId);
+        $salePrice = $row->isOnSale ? $this->taxedPrices->taxedPrice($row->salePrice, $row->taxRuleId, $row->productId) : null;
 
-                pse.ID AS ID,
-                pse.WEIGHT AS WEIGHT,
-                pse.PROMO AS PROMO,
-                product.ID AS ID_PRODUCT,
-                product.REF AS REF_PRODUCT,
-                product.VISIBLE AS PRODUCT_VISIBLE,
-                product_i18n.TITLE AS TITLE,
-                product_i18n.CHAPO AS CHAPO,
-                product_i18n.DESCRIPTION AS DESCRIPTION,
-                COALESCE (brand_i18n_with_locale.TITLE, brand_i18n_without_locale.TITLE) AS BRAND_TITLE,
-                pse.QUANTITY AS QUANTITY,
-                pse.EAN_CODE AS EAN_CODE,
-                product_category.CATEGORY_ID AS CATEGORY_ID,
-                product.TAX_RULE_ID AS TAX_RULE_ID,
-                COALESCE(price_on_currency.PRICE, CASE WHEN NOT ISNULL(price_default.PRICE) THEN ROUND(price_default.PRICE * :currate, 2) END) AS PRICE,
-                COALESCE(price_on_currency.PROMO_PRICE, CASE WHEN NOT ISNULL(price_default.PROMO_PRICE) THEN ROUND(price_default.PROMO_PRICE * :currate, 2) END) AS PROMO_PRICE,
-                rewriting_url.URL AS REWRITTEN_URL,
-                COALESCE(product_image_i18n_on_pse.FILE, product_image_i18n_default.FILE) AS IMAGE_NAME,
-                
-                FROM product_sale_elements AS pse
-                
-                INNER JOIN product ON (pse.PRODUCT_ID = product.ID) AND product.VISIBLE = 1
-                LEFT OUTER JOIN product_price price_on_currency ON (pse.ID = price_on_currency.PRODUCT_SALE_ELEMENTS_ID AND price_on_currency.CURRENCY_ID = :currid)
-                LEFT OUTER JOIN product_price price_default ON (pse.ID = price_default.PRODUCT_SALE_ELEMENTS_ID AND price_default.FROM_DEFAULT_CURRENCY = 1)
-                LEFT OUTER JOIN product_category ON (pse.PRODUCT_ID = product_category.PRODUCT_ID AND product_category.DEFAULT_CATEGORY = 1)
-                LEFT OUTER JOIN product_i18n ON (pse.PRODUCT_ID = product_i18n.ID AND product_i18n.LOCALE = :locale)
-                LEFT OUTER JOIN brand_i18n brand_i18n_with_locale ON (product.BRAND_ID = brand_i18n_with_locale.ID AND brand_i18n_with_locale.LOCALE = :locale)
-                LEFT OUTER JOIN brand_i18n brand_i18n_without_locale ON (product.BRAND_ID = brand_i18n_without_locale.ID)
-                LEFT OUTER JOIN rewriting_url ON (pse.PRODUCT_ID = rewriting_url.VIEW_ID AND rewriting_url.view = 'product' AND rewriting_url.view_locale = :locale AND rewriting_url.redirected IS NULL)
-                LEFT OUTER JOIN product_sale_elements_product_image pse_image ON (pse.ID = pse_image.PRODUCT_SALE_ELEMENTS_ID)
-                LEFT OUTER JOIN product_image product_image_default ON (pse.PRODUCT_ID = product_image_default.PRODUCT_ID AND product_image_default.POSITION = 1)
-                LEFT OUTER JOIN product_image_i18n product_image_i18n_default ON (product_image_i18n_default.ID = product_image_default.ID)
-                LEFT OUTER JOIN product_image product_image_on_pse ON (product_image_on_pse.ID = pse_image.PRODUCT_IMAGE_ID)
-                LEFT OUTER JOIN product_image_i18n product_image_i18n_on_pse ON (product_image_i18n_on_pse.ID = product_image_on_pse.ID)
-                
-                WHERE pse.ID NOT IN (SELECT pse_id FROM facebook_feed_product_excluded WHERE is_excluded = 1)
-                GROUP BY pse.ID";
-
-        $limit = $this->checkPositiveInteger($limit);
-        $offset = $this->checkPositiveInteger($offset);
-
-        if ($limit) {
-            $sql .= " LIMIT $limit";
-        }
-
-        if ($offset) {
-            if (!$limit) {
-                $sql .= " LIMIT 99999999999";
-            }
-            $sql .= " OFFSET $offset";
-        }
-
-        $con = Propel::getConnection();
-        $stmt = $con->prepare($sql);
-        $stmt->bindValue(':locale', $locale, \PDO::PARAM_STR);
-        $stmt->bindValue(':currid', $this->getDefaultCurrency()->getId(), \PDO::PARAM_INT);
-        $stmt->bindValue(':currate', $this->getDefaultCurrency()->getRate(), \PDO::PARAM_STR);
-
-        $stmt->execute();
-        $pseArray = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        return $pseArray;
+        return [
+            $row->productReference.'-'.$row->combinationId,
+            $row->productReference,
+            mb_substr($row->title, 0, self::TITLE_LENGTH),
+            $this->description($row->description),
+            $row->quantity > 0 ? 'in stock' : 'out of stock',
+            'new',
+            $this->formattedPrice($price, $currencyCode),
+            $this->link($row, $locale, $baseUrl),
+            $this->imageLink($row->imageFile, $baseUrl, $settings),
+            $this->imageLink($row->additionalImageFile, $baseUrl, $settings),
+            $row->brand,
+            $this->formattedQuantity($row->quantity),
+            null === $salePrice ? '' : $this->formattedPrice($salePrice, $currencyCode),
+            $row->color,
+            $row->size,
+        ];
     }
 
-    private function checkPositiveInteger($var): mixed
+    private function formattedPrice(float $price, string $currencyCode): string
     {
-        $var = filter_var($var, FILTER_VALIDATE_INT);
-        return ($var !== false && $var >= 0) ? $var : null;
+        return round($price, 2).' '.$currencyCode;
     }
 
-    private function getDefaultCurrency(): ?Currency
+    private function formattedQuantity(float $quantity): string
     {
-        return Currency::getDefaultCurrency();
+        return floor($quantity) === $quantity ? (string) (int) $quantity : (string) $quantity;
     }
 
-    private function getDefaultCountry()
+    /**
+     * Plain text: tags removed, entities decoded (the csv writer escapes what needs it). The
+     * text is cut in characters, never in bytes, so an accented letter is never split.
+     */
+    private function description(string $html): string
     {
-        return CountryQuery::create()->filterByIsoalpha3('FRA')->findOne();
+        return trim(mb_substr(html_entity_decode(strip_tags($html)), 0, self::DESCRIPTION_LENGTH));
     }
 
-
-    private function getTaxCalculator($taxRule, $product, $taxedCountry): Calculator
+    private function link(FeedRow $row, string $locale, string $baseUrl): string
     {
-        $taxCalculator = new Calculator();
-
-        $country = null;
-
-        //Fix for thelia <= 2.4.0
-        if (isset($taxedCountries[0])) {
-            $country = CountryQuery::create()->findOneById($taxedCountry->getId());
+        if (null !== $row->rewrittenUrl) {
+            return str_starts_with($row->rewrittenUrl, 'http') ? $row->rewrittenUrl : $baseUrl.'/'.ltrim($row->rewrittenUrl, '/');
         }
 
-        if (null === $country) {
-            $country = Country::getDefaultCountry();
+        $retrieved = URL::getInstance()->retrieve('product', $row->productId, $locale);
+        $url = !empty($retrieved->rewrittenUrl) ? $retrieved->rewrittenUrl : $retrieved->url;
+        $parts = \is_string($url) ? parse_url($url) : false;
+        if (!\is_array($parts) || !isset($parts['path'])) {
+            return '';
         }
 
-        $taxCalculator->loadTaxRule($taxRule, $country, $product);
-
-        return $taxCalculator;
+        return $baseUrl.'/'.ltrim($parts['path'], '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
     }
 
-    private function getUrl($product, $locale): string
+    private function imageLink(?string $file, string $baseUrl, FeedSettings $settings): string
     {
-        if (ConfigQuery::isMultiDomainActivated()) {
-            $baseUrl = LangQuery::create()->findOneByLocale($locale)->getUrl();
-
-            return $baseUrl . $this->findUrlFromView('product', $product['ID_PRODUCT'], $locale);
+        if (null === $file) {
+            return '';
         }
 
-        $urlManager = URL::getInstance();
+        $path = $this->imageUrls->pathOf($file, $settings->imageFilter);
 
-        if ($product['REWRITTEN_URL'] === null) {
-            return $urlManager->retrieve('product', $product['ID_PRODUCT'], $locale)->toString();
-        }
-
-        return $urlManager->absoluteUrl($product['REWRITTEN_URL']);
+        return null === $path ? '' : $baseUrl.$path;
     }
 
-    protected function findUrlFromView(string $view, string $viewId, string $locale): ?string
+    /**
+     * The address of the language when the shop has one domain for each language, else the
+     * address of the shop.
+     */
+    private function baseUrl(string $locale): string
     {
-        if (null !== $rewritingRetriever = URL::getInstance()->retrieve($view, $viewId, $locale)) {
-            $url =  !empty($rewritingRetriever->rewrittenUrl) ? $rewritingRetriever->rewrittenUrl : $rewritingRetriever->url;
-
-            if (null !== $url) {
-                return $this->generateUriFromUrl($url);
-            }
+        $lang = LangQuery::create()->findOneByLocale($locale);
+        if (!$lang instanceof Lang) {
+            throw FeedGenerationException::unknownLocale($locale);
         }
 
-        return null;
+        $url = ConfigQuery::isMultiDomainActivated() ? (string) $lang->getUrl() : (string) ConfigQuery::getConfiguredShopUrl();
+        $url = rtrim($url, '/');
+        if ('' === $url) {
+            throw FeedGenerationException::noShopUrl($locale);
+        }
+
+        return $url;
     }
 
-    protected function generateUriFromUrl(string $url): ?string
+    private function ensureDirectory(): void
     {
-        $url = parse_url($url);
-
-        if (!empty($url['path'])) {
-            return $url['path'] . (!empty($url['query']) ? '?' . $url['query'] : '');
+        if (!is_dir($this->exportDirectory) && !@mkdir($this->exportDirectory, 0o755, true) && !is_dir($this->exportDirectory)) {
+            throw FeedGenerationException::directoryNotWritable($this->exportDirectory);
         }
-
-        return null;
     }
 }
