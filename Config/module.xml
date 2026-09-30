@@ -14,13 +14,17 @@
     <descriptive locale="fr_FR">
         <title>Module permettant de générer un flux csv pour facebook</title>
     </descriptive>
+    <descriptive locale="de_DE">
+        <title>Modul zur Erzeugung eines CSV-Feeds für Facebook</title>
+    </descriptive>
     <!-- <logo></logo> -->
     <!--<images-folder>images</images-folder>-->
     <languages>
         <language>en_US</language>
         <language>fr_FR</language>
+        <language>de_DE</language>
     </languages>
-    <version>0.2.0</version>
+    <version>1.0.0</version>
     <authors>
         <author>
             <name>Arthur Lashermes</name>
@@ -28,15 +32,10 @@
         </author>
     </authors>
     <type>classic</type>
-    <!--
-    module dependencies
     <required>
-        <module version="&gt;=0.1">Front</module>
-        <module version="~1.0">HookCart</module>
-        <module version="&gt;0.2">HookSearch</module>
+        <module version="&gt;=2.0.10">TheliaLibrary</module>
     </required>
-    -->
-    <thelia>2.6.0</thelia>
+    <thelia>3.2.0</thelia>
     <stability>other</stability>
     <mandatory>0</mandatory>
     <hidden>0</hidden>

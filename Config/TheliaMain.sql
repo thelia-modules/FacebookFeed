@@ -5,11 +5,10 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------------
 -- facebook_feed_product_excluded
+-- The table is never dropped: it may hold the exclusions of a 0.x installation.
 -- ---------------------------------------------------------------------
 
-DROP TABLE IF EXISTS `facebook_feed_product_excluded`;
-
-CREATE TABLE `facebook_feed_product_excluded`
+CREATE TABLE IF NOT EXISTS `facebook_feed_product_excluded`
 (
     `pse_id` INTEGER NOT NULL,
     `is_excluded` TINYINT(4) DEFAULT 0,

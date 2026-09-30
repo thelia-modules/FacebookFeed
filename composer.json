@@ -1,12 +1,23 @@
 {
   "name": "thelia/facebook-feed-module",
-  "description": "FacebookFeed module for Thelia",
+  "description": "Generates the product feed (csv) of the Facebook and Meta catalog for Thelia 3",
   "license": "LGPL-3.0-or-later",
   "type": "thelia-module",
   "require": {
-    "thelia/installer": "~1.1"
+    "php": ">=8.3",
+    "thelia/installer": "^1.6",
+    "thelia/thelia-library-module": "^2.0.10"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "phpunit/phpunit": "^11.5"
   },
   "extra": {
     "installer-name": "FacebookFeed"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "FacebookFeed\\Tests\\": "Tests/"
+    }
   }
 }
