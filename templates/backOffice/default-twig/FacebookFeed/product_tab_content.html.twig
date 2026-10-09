@@ -12,7 +12,16 @@
     {% do exclusion_form.error_url.setRendered %}
 
     <p class="text-muted">{{ 'Check the combinations to keep out of the Facebook feed.'|trans({}, 'facebookfeed') }}</p>
-    {{ form_row(exclusion_form.excluded_combinations) }}
+    {# Each box with its label (reference and attribute values): the expanded choice widget of the back-office theme renders the boxes alone. #}
+    <div class="mb-3">
+        {% for combination in exclusion_form.excluded_combinations %}
+            <div class="form-check">
+                {{ form_widget(combination) }}
+                {{ form_label(combination, null, {label_attr: {class: 'form-check-label'}}) }}
+            </div>
+        {% endfor %}
+    </div>
+    {% do exclusion_form.excluded_combinations.setRendered %}
 
     {% if can_update %}
         <button type="submit" class="btn btn-primary">{{ 'Save'|trans }}</button>
