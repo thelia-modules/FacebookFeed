@@ -220,10 +220,11 @@ final class FeedGenerationTest extends FeedIntegrationTestCase
 
     public function testTheNumberOfQueriesDoesNotGrowWithTheNumberOfProducts(): void
     {
-        $this->service()->generate('fr_FR');
         $first = $this->product('BASE');
         $this->addImage($first, 1, 'base.jpg');
         $this->addressOf($first, 'fr_FR', 'base.html');
+        // What the core reads once for the whole process (default country, tax rule, tax) is not counted.
+        $this->service()->generate('fr_FR');
         $queriesForOneProduct = $this->countQueries(fn () => $this->service()->generate('fr_FR'));
 
         for ($index = 0; $index < 12; ++$index) {
